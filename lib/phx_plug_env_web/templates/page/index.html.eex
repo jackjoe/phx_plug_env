@@ -1,0 +1,50 @@
+<h1>Output test</h1>
+<p>This is a very basic Phoenix 1.6 app, out of the box. We added a very simple plug called `Foo`. It does absolutely nothing other then putting a passed variable onto the conn. The variable is called <code>foo</code> and should contain <code>bar</code>.</p>
+<p>The way the plug obtains this variable is from the router. In the router, we pass an application variable - which in its turn comes from the config and that fetches it from the enviroment at compile time.</p>
+<p>This was working prior to Phoenix 1.6, but since 1.6 it is empty and we fail to understand why.</p>
+<p>What we see now is that the value passed to the plug from the router is <code>nil</code>, whereas when calling the <code>Application.get_env</code> line later on, it returns 'bar' just fine.</p>
+<p>In code, here are the steps.</p>
+<h4><code>config/config.exs</code></h4>
+<pre>
+  config :phx_plug_env,
+    plug_foo: System.get_env("PLUG_FOO"),
+</pre>
+<h4><code>router</code></h4>
+<pre>
+  pipeline :plug_foo do
+    plug_foo = Application.get_env(:phx_plug_env, :plug_foo)
+    plug(PhxPlugEnvWeb.Plugs.Foo, plug_foo: plug_foo)
+  end
+</pre>
+<h4><code>plug foo</code></h4>
+<pre>
+  defmodule PhxPlugEnvWeb.Plugs.Foo do
+    alias Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, opts) do
+      plug_foo = Keyword.fetch(opts, :plug_foo)
+      Conn.assign(conn, :plug_foo, plug_foo)
+    end
+  end
+</pre>
+
+<h3>Running the app to pass env var</h3>
+<pre>
+  PLUG_FOO=bar iex -S mix phx.server
+</pre>
+
+<h3>Plug Foo output</h3>
+<code>
+  <%= if is_nil(@plug_foo) do %>
+  <span style="background: crimson; color: #fff;">plug foo is nil, should be 'bar'!</span>
+<% else %>
+  <span style="background: lime;">plug foo is <%= @plug_foo %></span>
+<% end %>
+</code>
+
+<h2>Final thoughts</h2>
+<p>Any idea why this stopped working. Maybe the way we were doing it was not conventional, but it worked so hey -\_o_/- We hope to get some good insights as this really caught us by surprise.</p>
+<p>Our solution now has simply be to not pass the variable to the plug from the router, which is not a big deal but it is inconventient: what if we have different pipelines calling the same Plug with different options, based on env settings?</p>
+<p>Thanks to anyone taking the time to check this.</p>
